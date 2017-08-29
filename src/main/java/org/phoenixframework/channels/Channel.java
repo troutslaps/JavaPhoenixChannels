@@ -100,8 +100,24 @@ public class Channel {
         return topic;
     }
 
-    public boolean isMember(final String topic) {
-        return this.topic.equals(topic);
+    public boolean isMember(final Envelope envelope) {
+        String topic = envelope.getTopic();
+        String event = envelope.getEvent();
+        String joinRef = envelope.getJoinRef();
+
+        if (!this.topic.equals(topic)) {
+            return false;
+        }
+
+        boolean isLifecycleEvent = ChannelEvent.getEvent(event) != null;
+
+        if (joinRef != null && isLifecycleEvent && joinRef != this.joinRef()) {
+            log.info("dropping outdated message topic: %s, event: %s, joinRef: %s",
+                    topic, event, joinRef);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -287,6 +303,10 @@ public class Channel {
     private void sendJoin() throws IOException {
         this.state = ChannelState.JOINING;
         this.joinPush.send();
+    }
+
+    public String joinRef() {
+        return this.joinPush.getRef();
     }
 
     public void cancel() {

@@ -2,15 +2,15 @@ package org.phoenixframework.channels;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimerTask;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class Push {
 
@@ -68,6 +68,8 @@ public class Push {
     private boolean sent = false;
 
     private final TimeoutHook timeoutHook;
+
+    private String ref;
 
     Push(final Channel channel, final String event, final JsonNode payload, final long timeout) {
         this.channel = channel;
@@ -134,6 +136,8 @@ public class Push {
         return recHooks;
     }
 
+   public String getRef() { return ref; }
+
     Envelope getReceivedEnvelope() {
         return receivedEnvelope;
     }
@@ -143,7 +147,7 @@ public class Push {
     }
 
     void send() throws IOException {
-        final String ref = channel.getSocket().makeRef();
+        this.ref = channel.getSocket().makeRef();
         log.trace("Push send, ref={}", ref);
 
         this.refEvent = Socket.replyEventName(ref);
@@ -161,8 +165,15 @@ public class Push {
 
         this.startTimeout();
         this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, this.ref, this.channel.joinRef());
         this.channel.getSocket().push(envelope);
+    }
+
+    private void reset() {
+        this.cancelRefEvent();
+        this.refEvent = null;
+        this.receivedEnvelope = null;
+        this.sent = false;
     }
 
     private void cancelRefEvent() {
