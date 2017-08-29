@@ -2,6 +2,9 @@ package org.phoenixframework.channels;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -9,9 +12,6 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingDeque;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Encapsulation of a Phoenix channel: a Socket, a topic and the channel's state.
@@ -231,12 +231,16 @@ public class Channel {
         }
     }
 
-    public void scheduleRepeatingTask(TimerTask timerTask, long ms) {
-        this.channelTimer.schedule(timerTask, ms, ms);
+    public synchronized void scheduleRepeatingTask(TimerTask timerTask, long ms) {
+        if (this.channelTimer != null) {
+            this.channelTimer.schedule(timerTask, ms, ms);
+        }
     }
 
-    public void scheduleTask(TimerTask timerTask, long ms) {
-        this.channelTimer.schedule(timerTask, ms);
+    public synchronized void scheduleTask(TimerTask timerTask, long ms) {
+        if (this.channelTimer != null) {
+            this.channelTimer.schedule(timerTask, ms);
+        }
     }
 
     @Override
@@ -285,5 +289,16 @@ public class Channel {
         this.joinPush.send();
     }
 
+    public void cancel() {
+        if (channelTimer != null) {
+            channelTimer.cancel();
+        }
+    }
 
+    public synchronized void finishTimers() {
+        if (channelTimer != null) {
+            channelTimer.cancel();
+        }
+        channelTimer = null;
+    }
 }

@@ -5,19 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -56,7 +57,7 @@ public class Socket {
             try {
                 final Envelope envelope = objectMapper.readValue(text, Envelope.class);
                 synchronized (channels) {
-                    for (final Channel channel : channels) {
+                    for (final Channel channel : getChannels()) {
                         if (channel.isMember(envelope.getTopic())) {
                             channel.trigger(envelope.getEvent(), envelope);
                         }
@@ -111,7 +112,10 @@ public class Socket {
                 }
                 if (reconnectOnFailure) {
                     scheduleReconnectTimer();
+                }else {
+                    cancelReconnectTimer();
                 }
+                cancelHeartbeatTimer();
             }
         }
     }
@@ -154,19 +158,23 @@ public class Socket {
 
     private WebSocket webSocket = null;
 
+    private Map<String, String> headers;
+
+
     /**
      * Annotated WS Endpoint. Private member to prevent confusion with "onConn*" registration
      * methods.
      */
     private final PhoenixWSListener wsListener = new PhoenixWSListener();
 
-    public Socket(final String endpointUri) throws IOException {
-        this(endpointUri, DEFAULT_HEARTBEAT_INTERVAL);
+    public Socket(final String endpointUri,  Map<String, String> headers) throws IOException {
+        this(endpointUri, DEFAULT_HEARTBEAT_INTERVAL, headers);
     }
 
-    public Socket(final String endpointUri, final int heartbeatIntervalInMs) {
+    public Socket(final String endpointUri, final int heartbeatIntervalInMs, Map<String, String> headers) {
         log.trace("PhoenixSocket({})", endpointUri);
         this.endpointUri = endpointUri;
+        this.headers = headers;
         this.heartbeatInterval = heartbeatIntervalInMs;
         this.timer = new Timer("Reconnect Timer for " + endpointUri);
     }
@@ -398,10 +406,14 @@ public class Socket {
     }
 
     private void triggerChannelError() {
+        for (final Channel channel : getChannels()) {
+            channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+        }
+    }
+
+    private List<Channel> getChannels() {
         synchronized (channels) {
-            for (final Channel channel : channels) {
-                channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
-            }
+            return new ArrayList<>(channels);
         }
     }
 
