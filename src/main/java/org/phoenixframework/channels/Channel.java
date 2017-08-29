@@ -88,7 +88,7 @@ public class Channel {
     /**
      * @return true if the socket is open and the channel has joined
      */
-    private boolean canPush() {
+    public boolean canPush() {
         return this.socket.isConnected() && this.state == ChannelState.JOINED;
     }
 
@@ -176,7 +176,7 @@ public class Channel {
         return this;
     }
 
-    private void onClose(final IMessageCallback callback) {
+    public void onClose(final IMessageCallback callback) {
         this.on(ChannelEvent.CLOSE.getPhxEvent(), callback);
     }
 
@@ -185,7 +185,7 @@ public class Channel {
      *
      * @param callback Callback to be invoked on error
      */
-    private void onError(final IErrorCallback callback) {
+    public void onError(final IErrorCallback callback) {
         this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
@@ -230,14 +230,14 @@ public class Channel {
         return push(event, null);
     }
 
-    private void rejoin() throws IOException {
+    public void rejoin() throws IOException {
         this.sendJoin();
         while (!this.pushBuffer.isEmpty()) {
             this.pushBuffer.removeFirst().send();
         }
     }
 
-    private void rejoinUntilConnected() throws IOException {
+    public void rejoinUntilConnected() throws IOException {
         if (this.state == ChannelState.ERRORED) {
             if (this.socket.isConnected()) {
                 this.rejoin();
